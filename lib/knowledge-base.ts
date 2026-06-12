@@ -147,11 +147,18 @@ export async function retrieveContext(question: string, topK = 5): Promise<ChatS
 
   if (!index.chunks.length) return [];
 
-  const questionVector = embedText(question);
-  return index.chunks
+  const questionVector = embedText(expandQuestion(question));
+  const ranked = index.chunks
     .map((chunk) => ({ ...chunk, score: cosine(questionVector, chunk.embedding) }))
-    .filter((chunk) => chunk.score > 0.08)
     .sort((a, b) => b.score - a.score)
+    .filter((chunk) => chunk.score > 0.03);
+
+  const fallback = isPlayerQuestion(question)
+    ? index.chunks.filter((chunk) => /player|registration|registered/i.test(`${chunk.fileName} ${chunk.chunkText}`))
+    : [];
+  const selected: Array<SourceChunk & { score?: number }> = ranked.length ? ranked : fallback;
+
+  return selected
     .slice(0, topK)
     .map((chunk) => ({
       fileName: chunk.fileName,
@@ -161,6 +168,9 @@ export async function retrieveContext(question: string, topK = 5): Promise<ChatS
 }
 
 export async function answerWithAi(question: string, sources: ChatSource[]) {
+  const countAnswer = await answerPlayerCountQuestion(question);
+  if (countAnswer) return countAnswer;
+
   if (!sources.length) {
     return { answer: NO_ANSWER, sources: [] };
   }
@@ -247,6 +257,64 @@ async function extractText(filePath: string): Promise<string> {
   throw new Error(`Unsupported file type: ${ext}`);
 }
 
+async function answerPlayerCountQuestion(question: string) {
+  if (!isPlayerCountQuestion(question)) return null;
+
+  const files = await listKnowledgeFiles();
+  const csvFiles = files.filter((filePath) => path.extname(filePath).toLowerCase() === ".csv");
+  const playerDocuments = [];
+
+  for (const filePath of csvFiles) {
+    const buffer = await fs.readFile(filePath);
+    const rows = parseCsvSync(buffer.toString("utf8"), {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    }) as Record<string, string>[];
+    const headers = Object.keys(rows[0] ?? {}).join(" ");
+    const fileName = path.basename(filePath);
+
+    if (isPlayerDocument(`${fileName} ${headers}`)) {
+      playerDocuments.push({ fileName, rows });
+    }
+  }
+
+  if (!playerDocuments.length) return null;
+
+  const total = playerDocuments.reduce((sum, document) => sum + document.rows.length, 0);
+  const sourceText = playerDocuments
+    .map((document) => `${document.fileName}: ${document.rows.length} player${document.rows.length === 1 ? "" : "s"}`)
+    .join("\n");
+
+  return {
+    answer: `There are ${total} registered player${total === 1 ? "" : "s"} in the current league documents.`,
+    sources: playerDocuments.map((document) => ({
+      fileName: document.fileName,
+      snippet: sourceText
+    }))
+  };
+}
+
+function isPlayerQuestion(question: string) {
+  return /\b(player|players|registered|registration|roster|team|teams|jersey)\b/i.test(question);
+}
+
+function isPlayerCountQuestion(question: string) {
+  return (
+    /\b(how many|number of|count|total|ilan|ilang)\b/i.test(question) &&
+    /\b(player|players|registered|registration|registrants)\b/i.test(question)
+  );
+}
+
+function isPlayerDocument(value: string) {
+  return /\b(player|players|registration|registered|birth|jersey|position|team)\b/i.test(value);
+}
+
+function expandQuestion(question: string) {
+  if (!isPlayerQuestion(question)) return question;
+  return `${question} player players registered registration roster team jersey position name`;
+}
+
 function splitIntoChunks(text: string, targetSize = 900, overlap = 140) {
   if (!text.trim()) return [];
   const chunks: string[] = [];
@@ -272,6 +340,7 @@ function embedText(text: string) {
     .toLowerCase()
     .replace(/[^a-z0-9+\s-]/g, " ")
     .split(/\s+/)
+    .map(normalizeToken)
     .filter((token) => token.length > 1);
 
   for (const token of tokens) {
@@ -282,6 +351,12 @@ function embedText(text: string) {
 
   const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
   return vector.map((value) => value / magnitude);
+}
+
+function normalizeToken(token: string) {
+  if (token.endsWith("ies") && token.length > 4) return `${token.slice(0, -3)}y`;
+  if (token.endsWith("s") && token.length > 3) return token.slice(0, -1);
+  return token;
 }
 
 function cosine(a: number[], b: number[]) {

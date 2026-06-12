@@ -1,0 +1,30 @@
+{
+  "name": "eaba-ai-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start",
+    "ingest": "node scripts/ingest.mjs"
+  },
+  "dependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "csv-parse": "5.5.6",
+    "lucide-react": "0.468.0",
+    "mammoth": "1.8.0",
+    "next": "^16.2.9",
+    "openai": "4.52.7",
+    "pdf-parse": "1.1.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.5.3"
+  },
+  "devDependencies": {
+    "autoprefixer": "10.4.19",
+    "postcss": "8.4.39",
+    "tailwindcss": "3.4.4"
+  }
+}

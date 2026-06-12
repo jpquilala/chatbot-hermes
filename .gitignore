@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+.env
+.env.local
+data/vector-store.json
+data/document-status.json
+tsconfig.tsbuildinfo
+.data

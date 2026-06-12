@@ -49,6 +49,56 @@ export function noAnswerMessage() {
   return NO_ANSWER;
 }
 
+export function answerCasualQuestion(question: string) {
+  const normalized = question
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return null;
+
+  if (/^(hi|hello|hey|yo|good morning|good afternoon|good evening|kumusta|kamusta|musta)( po)?$/.test(normalized)) {
+    return {
+      answer:
+        "Hello! I'm the EABA 40+ AI Assistant. You can ask me about registered players, schedules, results, standings, rules, announcements, or other official league documents.",
+      sources: []
+    };
+  }
+
+  if (/^(thanks|thank you|salamat|ty|okay thanks|ok thanks)( po)?$/.test(normalized)) {
+    return {
+      answer: "You're welcome. Ask me anytime if you need help with the EABA 40+ league documents.",
+      sources: []
+    };
+  }
+
+  if (/^(bye|goodbye|see you|see ya|paalam)$/.test(normalized)) {
+    return {
+      answer: "Goodbye. I'll be here when you need help with the EABA 40+ league documents.",
+      sources: []
+    };
+  }
+
+  if (/^(who are you|what are you|sino ka|ano ka)$/.test(normalized)) {
+    return {
+      answer:
+        "I'm the AI assistant for the Elder Amateur Basketball Association 40+ 4th Conference. For league facts, I answer only from the uploaded official documents.",
+      sources: []
+    };
+  }
+
+  if (/^(help|what can you do|ano kaya mo|paano gamitin|how do i use this)$/.test(normalized)) {
+    return {
+      answer:
+        "You can ask me about schedules, results, team standings, registered players, rules, policies, venues, and announcements. If the answer is not in the uploaded documents, I'll tell you instead of guessing.",
+      sources: []
+    };
+  }
+
+  return null;
+}
+
 export async function ensureKnowledgeBase() {
   await fs.mkdir(KNOWLEDGE_BASE_DIR, { recursive: true });
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -168,6 +218,9 @@ export async function retrieveContext(question: string, topK = 5): Promise<ChatS
 }
 
 export async function answerWithAi(question: string, sources: ChatSource[]) {
+  const casualAnswer = answerCasualQuestion(question);
+  if (casualAnswer) return casualAnswer;
+
   const countAnswer = await answerPlayerCountQuestion(question);
   if (countAnswer) return countAnswer;
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { answerWithAi, retrieveContext } from "@/lib/knowledge-base";
+import { answerCasualQuestion, answerWithAi, retrieveContext } from "@/lib/knowledge-base";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,11 @@ export async function POST(request: Request) {
 
     if (!question) {
       return NextResponse.json({ error: "Question is required" }, { status: 400 });
+    }
+
+    const casualAnswer = answerCasualQuestion(question);
+    if (casualAnswer) {
+      return NextResponse.json(casualAnswer);
     }
 
     const sources = await retrieveContext(question);

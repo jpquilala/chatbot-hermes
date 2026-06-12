@@ -36,11 +36,12 @@ export function KnowledgeAdmin() {
 
     try {
       const response = await fetch("/api/upload", { method: "POST", body: form });
-      if (!response.ok) throw new Error("Upload failed");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Upload failed");
       setStatus("Document indexed successfully");
       await loadDocuments();
-    } catch {
-      setStatus("Failed to process document");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to process document");
     } finally {
       event.target.value = "";
       setBusy(false);

@@ -36,6 +36,21 @@ export async function POST(request: Request) {
     await fs.writeFile(destination, bytes);
 
     const index = await ingestKnowledgeBase();
+    const uploadedDocument = index.documents.find((document) => document.fileName === safeName);
+
+    if (!uploadedDocument || uploadedDocument.status === "failed") {
+      await fs.rm(destination, { force: true });
+      await ingestKnowledgeBase();
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "The PDF was uploaded but could not be parsed. Please try a text-based PDF instead of a scanned/image-only PDF, or export the document again as a standard PDF."
+        },
+        { status: 422 }
+      );
+    }
+
     return NextResponse.json({ ok: true, fileName: safeName, documents: index.documents });
   } catch (error) {
     return NextResponse.json(

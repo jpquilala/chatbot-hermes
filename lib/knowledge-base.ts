@@ -372,7 +372,8 @@ async function extractText(filePath: string): Promise<string> {
     return result.value;
   }
   if (ext === ".pdf") {
-    const pdfParse = (await import("pdf-parse")).default;
+    const pdfParseModule = await import("pdf-parse/lib/pdf-parse.js");
+    const pdfParse = pdfParseModule.default ?? pdfParseModule;
     const result = await pdfParse(buffer);
     return result.text;
   }

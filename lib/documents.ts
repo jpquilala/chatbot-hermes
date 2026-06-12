@@ -155,7 +155,7 @@ async function extractText(filePath: string) {
   const buffer = await fs.readFile(filePath);
 
   if (extension === ".pdf") {
-    const pdfModule = (await import("pdf-parse")) as unknown as {
+    const pdfModule = (await import("pdf-parse/lib/pdf-parse.js")) as unknown as {
       default?: (data: Buffer) => Promise<{ text: string }>;
     } & ((data: Buffer) => Promise<{ text: string }>);
     const pdf = pdfModule.default ?? pdfModule;

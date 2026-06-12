@@ -88,7 +88,10 @@ export function answerCasualQuestion(question: string) {
     };
   }
 
-  if (/^(help|what can you do|ano kaya mo|paano gamitin|how do i use this)$/.test(normalized)) {
+  if (
+    /^(help|what can you do|what can you help me with|what do you know|ano kaya mo|paano gamitin|how do i use this)$/.test(normalized) ||
+    /^(what|ano).*(help|ask|tanong|gawin|alam)/.test(normalized)
+  ) {
     return {
       answer:
         "You can ask me about schedules, results, team standings, registered players, rules, policies, venues, and announcements. If the answer is not in the uploaded documents, I'll tell you instead of guessing.",

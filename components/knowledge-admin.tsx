@@ -31,13 +31,29 @@ export function KnowledgeAdmin() {
     if (!file) return;
     setBusy(true);
     setStatus("Processing document...");
-    const form = new FormData();
-    form.append("file", file);
 
     try {
-      const response = await fetch("/api/upload", { method: "POST", body: form });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.error || "Upload failed");
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const shouldExtractInBrowser = isPdf && file.size > 4 * 1024 * 1024;
+
+      if (shouldExtractInBrowser) {
+        setStatus("This PDF is large, so I’m extracting the text in your browser before upload...");
+        const text = await extractPdfText(file);
+        const response = await fetch("/api/upload-text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName: file.name, text })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Upload failed");
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        const response = await fetch("/api/upload", { method: "POST", body: form });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Upload failed");
+      }
+
       setStatus("Document indexed successfully");
       await loadDocuments();
     } catch (error) {
@@ -135,6 +151,34 @@ export function KnowledgeAdmin() {
       </section>
     </div>
   );
+}
+
+async function extractPdfText(file: File) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`;
+
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await pdfjs.getDocument({ data }).promise;
+  const pages: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const text = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (text) pages.push(`Page ${pageNumber}\n${text}`);
+  }
+
+  const extracted = pages.join("\n\n").trim();
+  if (!extracted) {
+    throw new Error("No extractable text found in this PDF. If it is scanned, OCR support is needed.");
+  }
+
+  return extracted;
 }
 
 function formatDate(value: string) {

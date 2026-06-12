@@ -90,7 +90,7 @@ export function answerCasualQuestion(question: string) {
 
   if (
     /^(help|what can you do|what can you help me with|what do you know|ano kaya mo|paano gamitin|how do i use this)$/.test(normalized) ||
-    /^(what|ano).*(help|ask|tanong|gawin|alam)/.test(normalized)
+    /^(what|ano).*(\bhelp\b|\bask\b|\btanong\b|\bgawin\b|\balam\b)/.test(normalized)
   ) {
     return {
       answer:

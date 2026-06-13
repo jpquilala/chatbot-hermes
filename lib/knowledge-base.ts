@@ -3,6 +3,12 @@ import path from "node:path";
 import crypto from "node:crypto";
 import OpenAI from "openai";
 import { parse as parseCsvSync } from "csv-parse/sync";
+import {
+  isSupabaseKnowledgeConfigured,
+  listSupabaseDocuments,
+  readSupabaseVectorIndex,
+  saveVectorIndexToSupabase
+} from "@/lib/supabase-knowledge";
 
 export type KnowledgeDocument = {
   fileName: string;
@@ -23,7 +29,7 @@ export type SourceChunk = {
   embedding: number[];
 };
 
-type VectorIndex = {
+export type VectorIndex = {
   generatedAt: string;
   documents: KnowledgeDocument[];
   chunks: SourceChunk[];
@@ -122,6 +128,11 @@ export async function listKnowledgeFiles() {
 }
 
 export async function listDocuments(): Promise<KnowledgeDocument[]> {
+  if (isSupabaseKnowledgeConfigured()) {
+    const supabaseDocuments = await listSupabaseDocuments();
+    if (supabaseDocuments) return supabaseDocuments;
+  }
+
   const index = await readVectorIndex();
   const indexedByName = new Map(index.documents.map((document) => [document.fileName, document]));
   const files = await listKnowledgeFiles();
@@ -188,14 +199,18 @@ export async function ingestKnowledgeBase(): Promise<VectorIndex> {
 
   const index: VectorIndex = { generatedAt: new Date().toISOString(), documents, chunks };
   await fs.writeFile(VECTOR_INDEX_PATH, JSON.stringify(index, null, 2));
+  await saveVectorIndexToSupabase(index);
   return index;
 }
 
 export async function retrieveContext(question: string, topK = 5): Promise<ChatSource[]> {
   let index = await readVectorIndex();
-  const files = await listKnowledgeFiles();
-  if (!index.generatedAt || index.chunks.length === 0 || files.length !== index.documents.length) {
-    index = await ingestKnowledgeBase();
+
+  if (!isSupabaseKnowledgeConfigured()) {
+    const files = await listKnowledgeFiles();
+    if (!index.generatedAt || index.chunks.length === 0 || files.length !== index.documents.length) {
+      index = await ingestKnowledgeBase();
+    }
   }
 
   if (!index.chunks.length) return [];
@@ -327,6 +342,11 @@ async function answerBroadKnowledgeQuestion(question: string) {
 }
 
 async function readVectorIndex(): Promise<VectorIndex> {
+  if (isSupabaseKnowledgeConfigured()) {
+    const supabaseIndex = await readSupabaseVectorIndex();
+    if (supabaseIndex) return supabaseIndex;
+  }
+
   await ensureKnowledgeBase();
   try {
     const raw = await fs.readFile(VECTOR_INDEX_PATH, "utf8");
@@ -338,6 +358,9 @@ async function readVectorIndex(): Promise<VectorIndex> {
 
 async function readOrIngestVectorIndex(): Promise<VectorIndex> {
   let index = await readVectorIndex();
+
+  if (isSupabaseKnowledgeConfigured()) return index;
+
   const files = await listKnowledgeFiles();
   if (!index.generatedAt || index.chunks.length === 0 || files.length !== index.documents.length) {
     index = await ingestKnowledgeBase();
